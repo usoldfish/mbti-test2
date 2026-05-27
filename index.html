@@ -2,8 +2,8 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MBTI 16型人格专业评测系统 v2.4</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MBTI 16型人格专业评测系统 v2.5</title>
     <style>
         :root {
             --bg-color: #F9FAFB; 
@@ -22,6 +22,8 @@
             margin: 0;
             padding: 0;
             font-family: "Inter", -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+            /* 优化2：消除手机端（iOS/Android）点击按钮时自带的半透明蓝色丑陋阴影 */
+            -webkit-tap-highlight-color: transparent;
         }
 
         body {
@@ -36,7 +38,6 @@
             position: relative;
         }
 
-        /* 画布层：用于彩带撒花 */
         #confetti-canvas {
             position: fixed;
             top: 0;
@@ -60,7 +61,6 @@
             transition: transform 0.2s ease;
         }
 
-        /* 警告状态下的卡片抖动反馈 */
         .container-card.shake {
             animation: cardShake 0.4s ease-in-out;
             border-top-color: var(--error-red);
@@ -110,7 +110,6 @@
             color: var(--text-main);
         }
 
-        /* 软内敛警告文字 */
         .error-tip {
             color: var(--error-red);
             font-size: 0.9rem;
@@ -305,7 +304,7 @@
 
     <div id="main-card" class="container-card">
         <h1 class="main-title">MBTI 16型人格多维评测系统</h1>
-        <div class="subtitle">HERMES_EDITION // KINETIC AUDIO v2.4</div>
+        <div class="subtitle">HERMES_EDITION // KINETIC AUDIO v2.5</div>
 
         <div id="welcome-view">
             <div class="section-box" style="border-left: 4px solid var(--hermes-orange);">
@@ -385,19 +384,42 @@
             <p style="margin-top: 3px;">【使用条款】本系统属于开源非商用项目（Non-Commercial Use Only），严禁用于任何盈利性商业活动。</p>
             <div class="footer-meta">
                 <span>作者：Gemini / 老鱼</span> &nbsp;|&nbsp; 
-                <span>上线时间：2026年5月27日</span>
+                <span>上线时间：<span id="live-date">2026年5月27日</span></span>
             </div>
         </div>
     </div>
 
     <script>
-        // ==================== 高级音频驱动核心 ====================
+        // ==================== 专为全端（含手机）优化的音频驱动核心 ====================
         let audioCtx = null;
-        function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+
+        // 核心突破：通过全局点击与触摸手势，提前交互解锁手机浏览器的音频墙
+        function autoUnlockAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume().then(() => {
+                    // 解锁成功，立即注销事件监听，不留任何性能尾巴
+                    document.removeEventListener('click', autoUnlockAudio);
+                    document.removeEventListener('touchstart', autoUnlockAudio);
+                });
+            }
+        }
+        document.addEventListener('click', autoUnlockAudio);
+        document.addEventListener('touchstart', autoUnlockAudio);
+
+        function initAudio() { 
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); 
+        }
         
         function playTone(freq, duration, type = "sine", volume = 0.1) {
             try {
                 initAudio();
+                // 手机端容错：如果音频流因长时间未操作被手机自动挂起，强制将其拉回激活状态
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
                 osc.type = type;
@@ -406,46 +428,39 @@
                 gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
                 osc.connect(gain); gain.connect(audioCtx.destination);
                 osc.start(); osc.stop(audioCtx.currentTime + duration);
-            } catch (e) {}
+            } catch (e) {
+                console.log("Audio playback muted or not allowed yet:", e);
+            }
         }
         
-        // 1. 开场声效：模拟号角/小喇叭齐鸣效果 (双频率复合和弦)
+        // 1. 开场喇叭号角声（融合和弦）
         function soundTrumpet() {
             try {
                 initAudio();
-                const now = audioCtx.currentTime;
-                // 吹响第一声高亢的号角
-                playTone(587.33, 0.15, "triangle", 0.15); // D5
+                playTone(587.33, 0.15, "triangle", 0.15); // 前置引音
                 setTimeout(() => {
-                    // 吹响第二声更有力的冲锋号
-                    playTone(880.00, 0.4, "sawtooth", 0.1);  // A5 (用锯齿波增加金属铜管质感)
-                    playTone(1174.66, 0.4, "sine", 0.08);   // D6 复合谐音
+                    playTone(880.00, 0.4, "sawtooth", 0.1);  // 嘹亮号角主音
+                    playTone(1174.66, 0.4, "sine", 0.08);   // 高八度泛音复合
                 }, 120);
             } catch(e){}
         }
 
-        // 2. 选择答案反馈
         function soundSelect() { playTone(800, 0.1, "sine"); }
-        
-        // 3. 上下翻页反馈
         function soundNav() { playTone(466.16, 0.12, "sine"); }
         
-        // 4. 未选强行翻页时的警告音 (双重急促低沉嘀嘀声)
+        // 未选卡关时的嘀嘀警报音
         function soundWarning() {
             playTone(180, 0.1, "square", 0.2);
-            setTimeout(() => {
-                playTone(180, 0.1, "square", 0.2);
-            }, 120);
+            setTimeout(() => { playTone(180, 0.1, "square", 0.2); }, 120);
         }
 
-        // 5. 胜利大捷音效
         function soundVictory() { 
             [523.25, 659.25, 783.99, 1046.50, 1318.51].forEach((f, i) => {
                 setTimeout(() => playTone(f, 0.5, "sine", 0.15), i * 90);
             });
         }
 
-        // ==================== Canvas 物理撒花特效引擎 ====================
+        // ==================== Canvas 物理彩带撒花引擎 ====================
         const canvas = document.getElementById("confetti-canvas");
         const ctx = canvas.getContext("2d");
         let confettiParticles = [];
@@ -461,18 +476,18 @@
         class Confetti {
             constructor() {
                 this.x = Math.random() * canvas.width;
-                this.y = Math.random() * -canvas.height - 20; // 从高空视窗上方落下
+                this.y = Math.random() * -canvas.height - 20; 
                 this.size = Math.random() * 8 + 6;
                 this.colors = ["#F37021", "#FFD700", "#10B981", "#3B82F6", "#EC4899", "#8B5CF6", "#FF6B6B"];
                 this.color = this.colors[Math.floor(Math.random() * this.colors.length)];
-                this.speedX = Math.random() * 4 - 2; // 左右飘摆摇曳速度
-                this.speedY = Math.random() * 3 + 2; // 下落速度
+                this.speedX = Math.random() * 4 - 2; 
+                this.speedY = Math.random() * 3 + 2; 
                 this.rotation = Math.random() * 360;
                 this.rotationSpeed = Math.random() * 4 - 2;
             }
             update() {
                 this.y += this.speedY;
-                this.x += this.speedX + Math.sin(this.y / 20) * 0.5; // 带有一点空气阻力导致的动态风摆
+                this.x += this.speedX + Math.sin(this.y / 20) * 0.5; 
                 this.rotation += this.rotationSpeed;
             }
             draw() {
@@ -480,7 +495,6 @@
                 ctx.translate(this.x, this.y);
                 ctx.rotate((this.rotation * Math.PI) / 180);
                 ctx.fillStyle = this.color;
-                // 绘制带旋转视角的长方形彩带碎片
                 ctx.fillRect(-this.size / 2, -this.size / 4, this.size, this.size / 2);
                 ctx.restore();
             }
@@ -488,16 +502,12 @@
 
         function triggerConfetti() {
             confettiParticles = [];
-            // 一次性生成 150 个彩色纸屑粒子
-            for (let i = 0; i < 150; i++) {
-                confettiParticles.push(new Confetti());
-            }
+            for (let i = 0; i < 150; i++) { confettiParticles.push(new Confetti()); }
             function animate() {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 confettiParticles.forEach((p, idx) => {
                     p.update();
                     p.draw();
-                    // 如果粒子落出屏幕，从顶部重新生成以持续一段时间，或直接裁切
                     if (p.y > canvas.height) {
                         confettiParticles[idx] = new Confetti();
                         confettiParticles[idx].y = -10;
@@ -506,15 +516,13 @@
                 animationFrameId = requestAnimationFrame(animate);
             }
             animate();
-            // 7秒后渐进式停止散落，释放性能空间
             setTimeout(() => {
                 cancelAnimationFrame(animationFrameId);
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
             }, 7000);
         }
 
-
-        // ==================== 评测核心数据与控制内核 ====================
+        // ==================== 题库逻辑控制内核 ====================
         const masterPool = {
             EI: [
                 { text: "在社交场合中，你通常会主动寻找不认识的人聊天来活跃气氛。" },
@@ -541,7 +549,7 @@
                 { text: "你经常觉得常规的、重复性的现实工作极其枯燥乏味。" },
                 { text: "做一件事情时，你习惯先搞清楚细节和数据，而不是直接看大框架。" },
                 { text: "你更容易注意到事物背后隐藏的蛛丝马迹以及内在逻辑联系。" },
-                { text: "你喜欢活在当下，享受眼前切切实实的物质世界（美食、风景）。" },
+                { text: "快节奏和感官刺激比深入钻研更有助于恢复你的元气。" },
                 { text: "你经常会有强烈的直觉，且这种直觉在日后往往被证明是准确的。" },
                 { text: "你倾向于用精确的数字和真实案例来向别人阐述你的观点。" },
                 { text: "在创意面前，具体的规则和传统是可以被随时打破的。" },
@@ -593,7 +601,7 @@
             "ENFP": { name: "竞选者 / 灵感播种机", desc: "自由烂漫的灵魂。充满热情与活力，能从单调生活中发现令人激动的可能。", careers: "创意策划、市场总监、自媒体大V、影视制片、旅游产品设计。", majors: "广告学、新媒体、旅游管理、艺术评论。" },
             "ISTJ": { name: "物流师 / 严谨守护者", desc: "务实、注重规则的社会基石。高度的责任心和执行力，是终极的防线。", careers: "审计师、财务、质量工程师、司法人员、运维专家。", majors: "会计学、审计学、法学、物流管理。" },
             "ISFJ": { name: "守卫者 / 幕后奉献者", desc: "极致细致的后盾。内敛且负责，对工作和家庭有着深厚的热爱。", careers: "医护人员、行政助理、HR、博物馆管理、特教老师。", majors: "护理学、学前教育、图书馆学、临床医学。" },
-            "ESTJ": { name: "总经理 / 秩序构建者", desc: "优秀的管理者。诚实、坦率，是天然的社会秩序和标准流程维护者。", careers: "运营总监、制造厂长、行政主管、项目审查、政府官员。", majors: "工程管理、工业工程、行政管理、供应链管理。" },
+            "ESTJ": { name: "总经理 / 秩序构建者", desc: "优秀的管理者。诚实、坦率，是天然的社会秩序 and 标准流程维护者。", careers: "运营总监、制造厂长、行政主管、项目审查、政府官员。", majors: "工程管理、工业工程、行政管理、供应链管理。" },
             "ESFJ": { name: "执政官 / 社交大管家", desc: "热心的社交枢纽。擅长照顾他人现实需求，建立和谐有爱的群体。", careers: "大客户经理、酒店管理、活动策划、办公室主任、社区医生。", majors: "酒店管理、市场营销、公共关系、社会工作。" },
             "ISTP": { name: "鉴赏家 / 硬核独行侠", desc: "手艺高超的实验家。热衷于通过亲身操作探索世界，面对危机无人能及的冷静。", careers: "机械工程师、法医、飞行员、外科医生、底层开发。", majors: "机械自动化、车辆工程、航天工程、软件工程。" },
             "ISFP": { name: "探险家 / 美学艺术家", desc: "低调的美学大师。不愿受束缚，用极具美感的方式（绘画、手作）诠释生命。", careers: "服装设计、室内设计、糕点师、摄影师、音乐人。", majors: "视觉传达、环境设计、美术学、园艺。" },
@@ -608,7 +616,8 @@
         function shuffle(arr) { return arr.sort(() => Math.random() - 0.5); }
 
         function initEngine() {
-            soundTrumpet(); // 💡 触发开场铜管喇叭声效！
+            // 在用户产生核心激活手势点击时，响彻小喇叭
+            soundTrumpet(); 
             
             testQuestions = [];
             userAnswers = new Array(28).fill(null);
@@ -653,7 +662,6 @@
             soundSelect();
             userAnswers[currentIdx] = w;
             renderQuestion();
-            // 自动前进至下一题
             setTimeout(() => { if (currentIdx < 27) { currentIdx++; renderQuestion(); } }, 300);
         }
 
@@ -666,13 +674,13 @@
         }
 
         function goNext() { 
-            // 💡 核心拦截机制：如果没选却点击下一题
+            // 如果用户卡关未选择答案
             if (userAnswers[currentIdx] === null) {
-                soundWarning(); // 播放双声报警音
+                soundWarning(); // 播放警报嘀嘀音
                 const card = document.getElementById("main-card");
-                card.classList.add("shake"); // 加上抖动和红光样式
-                setTimeout(() => card.classList.remove("shake"), 400); // 抖动动画完结后移除
-                return; // 强行拦截，阻止继续
+                card.classList.add("shake"); 
+                setTimeout(() => card.classList.remove("shake"), 400); 
+                return; 
             }
             
             if (currentIdx < 27) { 
@@ -685,12 +693,11 @@
         function calculateResult() {
             if (userAnswers.includes(null)) { 
                 soundWarning();
-                alert("检测到尚有未答题目，请完成所有题目后再提交。"); 
                 return; 
             }
             
-            soundVictory();   // 💡 鸣响最终升级大捷音效
-            triggerConfetti(); // 💡 触发 Canvas 五颜六色撒花特效！
+            soundVictory();   
+            triggerConfetti(); 
             
             let scores = { EI: 0, SN: 0, TF: 0, JP: 0 };
             testQuestions.forEach((q, i) => scores[q.type] += userAnswers[i]);
