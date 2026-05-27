@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MBTI 16型人格专业评测系统 v2.4</title>
+    <style>
+        :root {
+            --bg-color: #F9FAFB; 
+            --card-bg: #FFFFFF;
+            --hermes-orange: #F37021; 
+            --hermes-orange-hover: #fa8231; 
+            --text-main: #1A1A1A; 
+            --text-muted: #666666;
+            --border-soft: #EEEEEE;
+            --shadow: 0 20px 40px rgba(0, 0, 0, 0.05);
+            --error-red: #EF4444;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: "Inter", -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            padding: 40px 10px;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* 画布层：用于彩带撒花 */
+        #confetti-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 999;
+        }
+
+        .container-card {
+            width: 100%;
+            max-width: 720px;
+            background: var(--card-bg);
+            border-top: 6px solid var(--hermes-orange); 
+            border-radius: 12px;
+            padding: 45px 40px;
+            box-shadow: var(--shadow);
+            position: relative;
+            z-index: 10;
+            transition: transform 0.2s ease;
+        }
+
+        /* 警告状态下的卡片抖动反馈 */
+        .container-card.shake {
+            animation: cardShake 0.4s ease-in-out;
+            border-top-color: var(--error-red);
+        }
+
+        @keyframes cardShake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-6px); }
+            40%, 80% { transform: translateX(6px); }
+        }
+
+        h1.main-title {
+            font-size: 2.2rem;
+            text-align: center;
+            font-weight: 900;
+            letter-spacing: -1px;
+            margin-bottom: 8px;
+            color: var(--hermes-orange); 
+        }
+
+        .subtitle {
+            text-align: center;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-family: "Courier New", monospace;
+            margin-bottom: 35px;
+            letter-spacing: 1px;
+            font-weight: bold;
+        }
+
+        .hidden { display: none !important; }
+
+        .question-header {
+            margin-bottom: 30px;
+            padding-left: 15px;
+            border-left: 4px solid var(--hermes-orange);
+            transition: border-color 0.3s;
+        }
+        .container-card.shake .question-header {
+            border-left-color: var(--error-red);
+        }
+
+        .question-body {
+            font-size: 1.3rem; 
+            font-weight: 800; 
+            line-height: 1.4;
+            color: var(--text-main);
+        }
+
+        /* 软内敛警告文字 */
+        .error-tip {
+            color: var(--error-red);
+            font-size: 0.9rem;
+            font-weight: 700;
+            margin-top: 15px;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .container-card.shake .error-tip { opacity: 1; }
+
+        .options-group {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .option-btn {
+            background: #FFFFFF;
+            border: 1px solid var(--border-soft);
+            color: var(--text-main);
+            padding: 18px 22px;
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: left;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+        }
+
+        .option-btn:hover {
+            border-color: var(--hermes-orange);
+            background: rgba(243, 112, 33, 0.03);
+            transform: translateX(5px);
+        }
+
+        .option-btn.selected {
+            background: var(--hermes-orange);
+            color: #FFFFFF;
+            border-color: var(--hermes-orange);
+            box-shadow: 0 4px 15px rgba(243, 112, 33, 0.3);
+        }
+
+        .option-icon {
+            margin-right: 15px;
+            font-weight: bold;
+            font-family: "Courier New", monospace;
+            opacity: 0.6;
+        }
+        .option-btn.selected .option-icon { opacity: 1; }
+
+        .nav-footer {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+            margin-top: 40px;
+        }
+
+        .btn-action {
+            background: #FFFFFF;
+            border: 1.5px solid var(--text-main);
+            color: var(--text-main);
+            padding: 14px 28px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 0.9rem;
+            flex: 1;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .btn-action:hover:not(:disabled) {
+            background: var(--text-main);
+            color: #FFFFFF;
+        }
+
+        .btn-action:disabled {
+            border-color: #DDD;
+            color: #BBB;
+            cursor: not-allowed;
+        }
+
+        .btn-submit {
+            background: var(--hermes-orange);
+            border-color: var(--hermes-orange);
+            color: #FFFFFF;
+        }
+        .btn-submit:hover:not(:disabled) {
+            background: var(--hermes-orange-hover);
+            border-color: var(--hermes-orange-hover);
+            color: #FFFFFF;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(243, 112, 33, 0.3);
+        }
+
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .progress-bar-bg {
+            width: 100%;
+            height: 4px;
+            background: #EEE;
+            border-radius: 2px;
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background: var(--hermes-orange);
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        .res-highlight {
+            font-size: 4rem;
+            font-weight: 900;
+            color: var(--hermes-orange);
+            text-align: center;
+            line-height: 1;
+            margin: 10px 0;
+            letter-spacing: -2px;
+        }
+        .res-name {
+            font-size: 1.4rem;
+            text-align: center;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 30px;
+        }
+
+        .section-box {
+            background: #FDFDFD;
+            border: 1px solid #F0F0F0;
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .section-label {
+            color: var(--hermes-orange);
+            font-size: 0.8rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+        }
+        .section-label::after {
+            content: ""; flex: 1; height: 1px; background: #EEE; margin-left: 10px;
+        }
+        .section-text {
+            font-size: 0.95rem;
+            line-height: 1.7;
+            color: #333;
+        }
+
+        .footer-disclaimer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px dashed #E0E0E0;
+            font-size: 0.75rem;
+            color: #888888;
+            line-height: 1.6;
+            text-align: center;
+        }
+        .footer-meta {
+            margin-top: 8px;
+            font-weight: bold;
+            color: #555555;
+        }
+
+        @media (max-width: 480px) {
+            .container-card { padding: 35px 20px; border-radius: 0; }
+            h1.main-title { font-size: 1.8rem; }
+            .res-highlight { font-size: 3rem; }
+            .question-body { font-size: 1.15rem; }
+            .option-btn { padding: 15px; font-size: 0.9rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="confetti-canvas"></canvas>
+
+    <div id="main-card" class="container-card">
+        <h1 class="main-title">MBTI 16型人格多维评测系统</h1>
+        <div class="subtitle">HERMES_EDITION // KINETIC AUDIO v2.4</div>
+
+        <div id="welcome-view">
+            <div class="section-box" style="border-left: 4px solid var(--hermes-orange);">
+                <p style="margin-bottom: 10px; font-weight: 600;">欢迎使用专业级 MBTI 测评系统。</p>
+                <p style="color: var(--text-muted); line-height: 1.6; font-size: 0.9rem;">
+                    本系统采用随机交叉验证算法，从 56 道专家级题库中选取 28 道最具代表性的情境题目进行潜意识比对。选项扩充为5级量表，支持答题回溯修改，请凭第一直觉完成作答。
+                </p>
+            </div>
+            <button class="btn-submit btn-action" style="width: 100%; margin-top: 20px;" onclick="initEngine()">开始测评 / INITIALIZE</button>
+        </div>
+
+        <div id="quiz-view" class="hidden">
+            <div class="progress-info">
+                <span id="progress-text">QUESTION 01/28</span>
+                <span id="percent-text">0%</span>
+            </div>
+            <div class="progress-bar-bg">
+                <div id="progress-bar" class="progress-bar-fill"></div>
+            </div>
+            
+            <div class="question-header">
+                <div id="question-body" class="question-body">正在载入评测题目...</div>
+            </div>
+
+            <div class="options-group">
+                <button class="option-btn" data-weight="2" onclick="handleSelect(2)">
+                    <span class="option-icon">[++]</span> 非常符合我的情况
+                </button>
+                <button class="option-btn" data-weight="1" onclick="handleSelect(1)">
+                    <span class="option-icon">[+]</span> 比较符合我的表现
+                </button>
+                <button class="option-btn" data-weight="0" onclick="handleSelect(0)">
+                    <span class="option-icon">[0]</span> 处于中立或视情况而定
+                </button>
+                <button class="option-btn" data-weight="-1" onclick="handleSelect(-1)">
+                    <span class="option-icon">[-]</span> 较不符合我的表现
+                </button>
+                <button class="option-btn" data-weight="-2" onclick="handleSelect(-2)">
+                    <span class="option-icon">[--]</span> 完全不符合我的情况
+                </button>
+            </div>
+
+            <div id="error-message" class="error-tip">⚠️ 提示：请选择上方任意一项倾斜度后再进行下一步！</div>
+
+            <div class="nav-footer">
+                <button id="btn-prev" class="btn-action" onclick="goPrev()">Back</button>
+                <button id="btn-next" class="btn-action" onclick="goNext()">Next</button>
+                <button id="btn-submit" class="btn-action btn-submit hidden" onclick="calculateResult()">Submit Result</button>
+            </div>
+        </div>
+
+        <div id="result-view" class="hidden">
+            <p style="text-align: center; font-size: 0.8rem; font-weight: 800; color: #888;">ANALYSIS COMPLETE</p>
+            <div id="res-code" class="res-highlight">XXXX</div>
+            <div id="res-title" class="res-name"></div>
+
+            <div class="section-box">
+                <div class="section-label">人格画像 / Profile</div>
+                <div id="res-desc" class="section-text"></div>
+            </div>
+
+            <div class="section-box">
+                <div class="section-label">职业建议 / Careers</div>
+                <div id="res-careers" class="section-text"></div>
+            </div>
+
+            <div class="section-box">
+                <div class="section-label">推荐专业 / Academic</div>
+                <div id="res-majors" class="section-text"></div>
+            </div>
+
+            <button class="btn-action btn-submit" style="width: 100%; margin-top: 10px;" onclick="location.reload()">重新测试 / RESTART</button>
+        </div>
+
+        <div class="footer-disclaimer">
+            <p>【免责声明】本测试结果基于经典 MBTI 理论模型分析生成，结果仅供个人职业规划与自我认知参考，不构成任何权威心理诊断或最终学业就业依据。</p>
+            <p style="margin-top: 3px;">【使用条款】本系统属于开源非商用项目（Non-Commercial Use Only），严禁用于任何盈利性商业活动。</p>
+            <div class="footer-meta">
+                <span>作者：Gemini / 老鱼</span> &nbsp;|&nbsp; 
+                <span>上线时间：2026年5月27日</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== 高级音频驱动核心 ====================
+        let audioCtx = null;
+        function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+        
+        function playTone(freq, duration, type = "sine", volume = 0.1) {
+            try {
+                initAudio();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.start(); osc.stop(audioCtx.currentTime + duration);
+            } catch (e) {}
+        }
+        
+        // 1. 开场声效：模拟号角/小喇叭齐鸣效果 (双频率复合和弦)
+        function soundTrumpet() {
+            try {
+                initAudio();
+                const now = audioCtx.currentTime;
+                // 吹响第一声高亢的号角
+                playTone(587.33, 0.15, "triangle", 0.15); // D5
+                setTimeout(() => {
+                    // 吹响第二声更有力的冲锋号
+                    playTone(880.00, 0.4, "sawtooth", 0.1);  // A5 (用锯齿波增加金属铜管质感)
+                    playTone(1174.66, 0.4, "sine", 0.08);   // D6 复合谐音
+                }, 120);
+            } catch(e){}
+        }
+
+        // 2. 选择答案反馈
+        function soundSelect() { playTone(800, 0.1, "sine"); }
+        
+        // 3. 上下翻页反馈
+        function soundNav() { playTone(466.16, 0.12, "sine"); }
+        
+        // 4. 未选强行翻页时的警告音 (双重急促低沉嘀嘀声)
+        function soundWarning() {
+            playTone(180, 0.1, "square", 0.2);
+            setTimeout(() => {
+                playTone(180, 0.1, "square", 0.2);
+            }, 120);
+        }
+
+        // 5. 胜利大捷音效
+        function soundVictory() { 
+            [523.25, 659.25, 783.99, 1046.50, 1318.51].forEach((f, i) => {
+                setTimeout(() => playTone(f, 0.5, "sine", 0.15), i * 90);
+            });
+        }
+
+        // ==================== Canvas 物理撒花特效引擎 ====================
+        const canvas = document.getElementById("confetti-canvas");
+        const ctx = canvas.getContext("2d");
+        let confettiParticles = [];
+        let animationFrameId = null;
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener("resize", resizeCanvas);
+        resizeCanvas();
+
+        class Confetti {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * -canvas.height - 20; // 从高空视窗上方落下
+                this.size = Math.random() * 8 + 6;
+                this.colors = ["#F37021", "#FFD700", "#10B981", "#3B82F6", "#EC4899", "#8B5CF6", "#FF6B6B"];
+                this.color = this.colors[Math.floor(Math.random() * this.colors.length)];
+                this.speedX = Math.random() * 4 - 2; // 左右飘摆摇曳速度
+                this.speedY = Math.random() * 3 + 2; // 下落速度
+                this.rotation = Math.random() * 360;
+                this.rotationSpeed = Math.random() * 4 - 2;
+            }
+            update() {
+                this.y += this.speedY;
+                this.x += this.speedX + Math.sin(this.y / 20) * 0.5; // 带有一点空气阻力导致的动态风摆
+                this.rotation += this.rotationSpeed;
+            }
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate((this.rotation * Math.PI) / 180);
+                ctx.fillStyle = this.color;
+                // 绘制带旋转视角的长方形彩带碎片
+                ctx.fillRect(-this.size / 2, -this.size / 4, this.size, this.size / 2);
+                ctx.restore();
+            }
+        }
+
+        function triggerConfetti() {
+            confettiParticles = [];
+            // 一次性生成 150 个彩色纸屑粒子
+            for (let i = 0; i < 150; i++) {
+                confettiParticles.push(new Confetti());
+            }
+            function animate() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                confettiParticles.forEach((p, idx) => {
+                    p.update();
+                    p.draw();
+                    // 如果粒子落出屏幕，从顶部重新生成以持续一段时间，或直接裁切
+                    if (p.y > canvas.height) {
+                        confettiParticles[idx] = new Confetti();
+                        confettiParticles[idx].y = -10;
+                    }
+                });
+                animationFrameId = requestAnimationFrame(animate);
+            }
+            animate();
+            // 7秒后渐进式停止散落，释放性能空间
+            setTimeout(() => {
+                cancelAnimationFrame(animationFrameId);
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }, 7000);
+        }
+
+
+        // ==================== 评测核心数据与控制内核 ====================
+        const masterPool = {
+            EI: [
+                { text: "在社交场合中，你通常会主动寻找不认识的人聊天来活跃气氛。" },
+                { text: "连续几天独处、不接触外人会让你感到精神饱满而不是孤寂单调。" },
+                { text: "你喜欢通过与他人展开激烈的口头头脑风暴来理清自己的思路。" },
+                { text: "在长途旅行的火车或飞机上，你倾向于闭目养神而不是跟邻座搭讪。" },
+                { text: "你更喜欢成为群体瞩目的焦点，而不是待在幕后做协助和支撑工作。" },
+                { text: "高强度的社交轰炸（如聚会、团建）会迅速消耗你的精力储备。" },
+                { text: "认识新朋友时，你通常是那个先开口打招呼并介绍自己的人。" },
+                { text: "在遇到开心的事时，你的第一反应是立刻找人分享而不是独自回味。" },
+                { text: "你倾向于拥有一个由极少数知心人组成的高黏性朋友圈。" },
+                { text: "在团队会议中，你通常在别人讲完之前就已经想好了发言内容。" },
+                { text: "你觉得文字交流（如微信）比直接打电话更让你感到轻松。" },
+                { text: "自发的、毫无准备的线下聚会往往能让你感到兴奋。" },
+                { text: "你习惯于在安静、无干扰的环境中独自消化内心的各种情绪。" },
+                { text: "别人经常用“充满活力”、“外向”等词汇来评价你。" }
+            ],
+            SN: [
+                { text: "你更关注具体的、正在发生的事实，而非虚无缥缈的未来图景。" },
+                { text: "你常常沉浸在对人类、宇宙或者未来的哲学性思考中。" },
+                { text: "学习新技能时，你喜欢遵循标准的操作手册，而不是靠自己乱摸索。" },
+                { text: "你对具有科幻色彩、充满隐喻的作品比现实题材作品更感兴趣。" },
+                { text: "你更愿意被人夸赞为一个“务实靠谱”的人，而非“富有灵感”的人。" },
+                { text: "你经常觉得常规的、重复性的现实工作极其枯燥乏味。" },
+                { text: "做一件事情时，你习惯先搞清楚细节和数据，而不是直接看大框架。" },
+                { text: "你更容易注意到事物背后隐藏的蛛丝马迹以及内在逻辑联系。" },
+                { text: "你喜欢活在当下，享受眼前切切实实的物质世界（美食、风景）。" },
+                { text: "你经常会有强烈的直觉，且这种直觉在日后往往被证明是准确的。" },
+                { text: "你倾向于用精确的数字和真实案例来向别人阐述你的观点。" },
+                { text: "在创意面前，具体的规则和传统是可以被随时打破的。" },
+                { text: "解决问题时，你倾向于使用已经过验证的成熟旧方法。" },
+                { text: "你喜欢抽象思维，对探讨未解之谜或宏大命题充满热忱。" }
+            ],
+            TF: [
+                { text: "在讨论问题时，客观真理比顾及大家的面子和情绪更重要。" },
+                { text: "你很容易对电影主角或者朋友的悲惨遭遇产生强烈的同情。" },
+                { text: "你擅长在混乱中保持冷静，用纯粹的逻辑利弊分析来做决策。" },
+                { text: "当朋友来找你倾诉时，你第一反应是安抚情绪而非急着支招。" },
+                { text: "即便你讨厌一个人，如果他有能力，你依然可以公正地赞赏他。" },
+                { text: "你在做关键决策时，内心的价值观取向往往超越纯利弊分析。" },
+                { text: "如果一段关系或争论充满了不讲道理的感性，你会感到抓狂。" },
+                { text: "你是个高度敏感的人，容易因为别人一句无心的话而揣摩很久。" },
+                { text: "你认为建立明确规则并执行，比针对特殊情况网开一面更公平。" },
+                { text: "在买东西或做重大选择时，你常常因为“太喜欢”而推翻理性计划。" },
+                { text: "你能够非常硬得下心拒绝别人不合理的请求。" },
+                { text: "维持群体或团队内部的人际和谐，是你极为看重的事情。" },
+                { text: "听到不合逻辑、漏洞百出的发言时，你会忍不住反驳。" },
+                { text: "你经常被评价为“理智、冷静”而非“感性、热情”。" }
+            ],
+            JP: [
+                { text: "你喜欢在旅行前做周密的攻略，并尽可能按计划执行。" },
+                { text: "你觉得随性、没有计划的流浪式旅行才是真正的放松。" },
+                { text: "你的房间或办公桌通常维持着整洁、有条理的状态。" },
+                { text: "你擅长利用截止日期（DDL）带来的压迫感在最后一刻完成任务。" },
+                { text: "如果原定好的计划突然遭遇变动，你会感到焦虑或不快。" },
+                { text: "面对突发状况，你通常能享受随机应变带来的乐趣。" },
+                { text: "你习惯凡事赶早不赶晚，手头的任务想尽快做完才安心。" },
+                { text: "你喜欢保持选择的开放性，非必要情况绝不早早定死。" },
+                { text: "你非常喜欢列待办清单（To-Do List）并逐一勾选完成。" },
+                { text: "你觉得按部就班的生活有些压抑，更喜欢不确定的未来。" },
+                { text: "做事时你追求确定性，讨厌悬而不决、没有结果的状态。" },
+                { text: "你经常因为拖延或临时起意，去干一些计划之外的事情。" },
+                { text: "在开始大项目前，你习惯先把所有的步骤拆解清楚。" },
+                { text: "你认为过早下结论或做计划会扼杀许多潜在的灵感。" }
+            ]
+        };
+
+        const mbtiDatabase = {
+            "INTJ": { name: "建筑师 / 理性战略家", desc: "追求完美的独立主义者。逻辑严密，眼光长远，对低效率充满不耐烦。擅长在幕后运筹帷幄。", careers: "战略顾问、首席架构师、风险投资、科研学者、精算师。", majors: "计算机科学、基础数学、金融工程、工商管理。" },
+            "INTP": { name: "逻辑学家 / 思想极客", desc: "热衷于寻找本质逻辑。拥有不可思议的创造力，喜欢独自解构复杂的理论迷宫。", careers: "算法工程师、科研人员、大学教授、数据科学家、独立制作人。", majors: "理论物理、哲学、大数据、软件工程。" },
+            "ENTJ": { name: "指挥官 / 铁血领袖", desc: "天生的领袖。极具意志力和组织手腕，擅长将远见转化为高效的团队行动。", careers: "CEO、创业者、管理咨询、项目经理、投行合伙人。", majors: "工商管理、国际经济贸易、金融学、法学。" },
+            "ENTP": { name: "辩论家 / 破局发明家", desc: "聪明、叛逆的挑战者。热衷于打破常规，擅长从全新角度解构世界。", careers: "产品经理、智库研究员、公关专家、风投经理、创意总监。", majors: "市场营销、社会学、政治学、心理学。" },
+            "INFJ": { name: "提倡者 / 灵魂导师", desc: "稀有的理想主义者。兼具同理心与执行力，坚定地将宏愿变为现实。", careers: "心理咨询师、作家、教育专家、NGO领袖、艺术指导。", majors: "应用心理学、文学、教育学、社会学。" },
+            "INFP": { name: "调停者 / 精神吟游诗人", desc: "内心丰盈的守护者。坚定地守护内心的价值观，寻找事物身上的闪光点。", careers: "小说家、插画师、编剧、心理疗愈师、自媒体创作。", majors: "戏剧文学、美术学、心理学、环境生态。" },
+            "ENFJ": { name: "主人公 / 灯塔式领导", desc: "极具感染力的灯塔。擅长凝聚人心，激发他人潜能，常为了公众福祉奉献能量。", careers: "公关总监、金牌教师、组织发展顾问、培训师、政界。", majors: "人力资源、播音主持、行政管理、新闻传播。" },
+            "ENFP": { name: "竞选者 / 灵感播种机", desc: "自由烂漫的灵魂。充满热情与活力，能从单调生活中发现令人激动的可能。", careers: "创意策划、市场总监、自媒体大V、影视制片、旅游产品设计。", majors: "广告学、新媒体、旅游管理、艺术评论。" },
+            "ISTJ": { name: "物流师 / 严谨守护者", desc: "务实、注重规则的社会基石。高度的责任心和执行力，是终极的防线。", careers: "审计师、财务、质量工程师、司法人员、运维专家。", majors: "会计学、审计学、法学、物流管理。" },
+            "ISFJ": { name: "守卫者 / 幕后奉献者", desc: "极致细致的后盾。内敛且负责，对工作和家庭有着深厚的热爱。", careers: "医护人员、行政助理、HR、博物馆管理、特教老师。", majors: "护理学、学前教育、图书馆学、临床医学。" },
+            "ESTJ": { name: "总经理 / 秩序构建者", desc: "优秀的管理者。诚实、坦率，是天然的社会秩序和标准流程维护者。", careers: "运营总监、制造厂长、行政主管、项目审查、政府官员。", majors: "工程管理、工业工程、行政管理、供应链管理。" },
+            "ESFJ": { name: "执政官 / 社交大管家", desc: "热心的社交枢纽。擅长照顾他人现实需求，建立和谐有爱的群体。", careers: "大客户经理、酒店管理、活动策划、办公室主任、社区医生。", majors: "酒店管理、市场营销、公共关系、社会工作。" },
+            "ISTP": { name: "鉴赏家 / 硬核独行侠", desc: "手艺高超的实验家。热衷于通过亲身操作探索世界，面对危机无人能及的冷静。", careers: "机械工程师、法医、飞行员、外科医生、底层开发。", majors: "机械自动化、车辆工程、航天工程、软件工程。" },
+            "ISFP": { name: "探险家 / 美学艺术家", desc: "低调的美学大师。不愿受束缚，用极具美感的方式（绘画、手作）诠释生命。", careers: "服装设计、室内设计、糕点师、摄影师、音乐人。", majors: "视觉传达、环境设计、美术学、园艺。" },
+            "ESTP": { name: "企业家 / 浪尖行动派", desc: "精力充沛的行动巨人。不惧风险，在动态的变化中瞬间捕捉商机。", careers: "风控经理、刑警、操盘手、谈判专家、极限运动员。", majors: "金融学、体育教育、侦查学、市场营销。" },
+            "ESFP": { name: "表演者 / 舞台巨星", desc: "快乐的源泉。将世界当作游乐场，极具时尚感与幽默感，散发欢笑。", careers: "演艺明星、时尚买手、舞台演员、公关、销售顾问。", majors: "表演、市场营销、主持艺术、舞蹈学。" }
+        };
+
+        let testQuestions = []; 
+        let currentIdx = 0;
+        let userAnswers = [];   
+
+        function shuffle(arr) { return arr.sort(() => Math.random() - 0.5); }
+
+        function initEngine() {
+            soundTrumpet(); // 💡 触发开场铜管喇叭声效！
+            
+            testQuestions = [];
+            userAnswers = new Array(28).fill(null);
+            currentIdx = 0;
+            const dims = ['EI', 'SN', 'TF', 'JP'];
+            dims.forEach(dim => {
+                const sub = shuffle([...masterPool[dim]]).slice(0, 7);
+                sub.forEach(q => testQuestions.push({ text: q.text, type: dim }));
+            });
+            shuffle(testQuestions);
+            document.getElementById("welcome-view").classList.add("hidden");
+            document.getElementById("quiz-view").classList.remove("hidden");
+            renderQuestion();
+        }
+
+        function renderQuestion() {
+            const currentNum = currentIdx + 1;
+            document.getElementById("progress-text").innerText = `QUESTION ${String(currentNum).padStart(2, '0')}/28`;
+            const pct = Math.round((currentIdx / 28) * 100);
+            document.getElementById("percent-text").innerText = `${pct}%`;
+            document.getElementById("progress-bar").style.width = `${pct}%`;
+
+            document.getElementById("question-body").innerText = testQuestions[currentIdx].text;
+
+            const saved = userAnswers[currentIdx];
+            document.querySelectorAll(".option-btn").forEach(btn => {
+                btn.classList.remove("selected");
+                if (saved !== null && parseInt(btn.getAttribute("data-weight")) === saved) btn.classList.add("selected");
+            });
+
+            document.getElementById("btn-prev").disabled = (currentIdx === 0);
+            if (currentIdx === 27) {
+                document.getElementById("btn-next").classList.add("hidden");
+                document.getElementById("btn-submit").classList.remove("hidden");
+            } else {
+                document.getElementById("btn-next").classList.remove("hidden");
+                document.getElementById("btn-submit").classList.add("hidden");
+            }
+        }
+
+        function handleSelect(w) {
+            soundSelect();
+            userAnswers[currentIdx] = w;
+            renderQuestion();
+            // 自动前进至下一题
+            setTimeout(() => { if (currentIdx < 27) { currentIdx++; renderQuestion(); } }, 300);
+        }
+
+        function goPrev() { 
+            if (currentIdx > 0) { 
+                soundNav(); 
+                currentIdx--; 
+                renderQuestion(); 
+            } 
+        }
+
+        function goNext() { 
+            // 💡 核心拦截机制：如果没选却点击下一题
+            if (userAnswers[currentIdx] === null) {
+                soundWarning(); // 播放双声报警音
+                const card = document.getElementById("main-card");
+                card.classList.add("shake"); // 加上抖动和红光样式
+                setTimeout(() => card.classList.remove("shake"), 400); // 抖动动画完结后移除
+                return; // 强行拦截，阻止继续
+            }
+            
+            if (currentIdx < 27) { 
+                soundNav(); 
+                currentIdx++; 
+                renderQuestion(); 
+            } 
+        }
+
+        function calculateResult() {
+            if (userAnswers.includes(null)) { 
+                soundWarning();
+                alert("检测到尚有未答题目，请完成所有题目后再提交。"); 
+                return; 
+            }
+            
+            soundVictory();   // 💡 鸣响最终升级大捷音效
+            triggerConfetti(); // 💡 触发 Canvas 五颜六色撒花特效！
+            
+            let scores = { EI: 0, SN: 0, TF: 0, JP: 0 };
+            testQuestions.forEach((q, i) => scores[q.type] += userAnswers[i]);
+            let code = "";
+            code += (scores.EI >= 0) ? "E" : "I";
+            code += (scores.SN >= 0) ? "S" : "N";
+            code += (scores.TF >= 0) ? "T" : "F";
+            code += (scores.JP >= 0) ? "J" : "P";
+            const res = mbtiDatabase[code];
+            document.getElementById("res-code").innerText = code;
+            document.getElementById("res-title").innerText = res.name;
+            document.getElementById("res-desc").innerText = res.desc;
+            document.getElementById("res-careers").innerText = res.careers;
+            document.getElementById("res-majors").innerText = res.majors;
+            document.getElementById("quiz-view").classList.add("hidden");
+            document.getElementById("result-view").classList.remove("hidden");
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>
