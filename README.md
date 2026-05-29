@@ -1,7 +1,7 @@
 # 🍊 MBTI 16 Personality Test - Minimalist Premium Edition
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-orange.svg)](https://opensource.org/licenses/MIT)
-[![Deploy: GitHub Pages](https://img.shields.io/badge/Deploy-GitHub_Pages-FF6B00.svg)](https://your-username.github.io/your-repo-name/)
+[![Deploy: GitHub Pages](https://img.shields.io/badge/Deploy-GitHub_Pages-FF6B00.svg)](https://usoldfish.github.io/mbti-test2/)
 
 一个专为移动端深度优化的 16 人格（MBTI）测评网页。采用极致的现代极简主义设计，融入 **Hermès Orange（爱马仕橙）** 高端视觉美学，并内置沉浸式 Web Audio 交互音效。
 
